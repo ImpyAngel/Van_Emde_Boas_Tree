@@ -1,7 +1,7 @@
 #include <iostream>
-#include <vector>
 #include <map>
 #include <memory>
+#include <assert.h>
 #include "veb.h"
 
 template <unsigned int T>
@@ -10,7 +10,7 @@ struct VEBTree : public AbstractVEBTree<T> {
 private:
     bool empty;
     unsigned long long min, max;
-    std::map<unsigned long long, std::shared_ptr<VEBTree<T / 2>>> data;
+    std::map<unsigned long long, std::unique_ptr<VEBTree<T / 2>>> data;
     unsigned long long higher(unsigned long long value) const {
         return value >> T;
     }
@@ -19,7 +19,15 @@ private:
     }
 
 public:
-    bool is_empty(){
+
+    bool has(unsigned long long value) const {
+        if (empty) return false;
+        if (min == value || max == value) return true;
+        if (data.find(higher(value)) == data.end()) return false;
+        return data.at(higher(value))->has(lower(value));
+    }
+
+    bool is_empty() const {
         return empty;
     }
 
@@ -53,14 +61,15 @@ public:
             std::swap(value, min);
         }
         if (data.find(higher(value)) == data.end()) {
-        data.insert(std::pair<unsigned long long, std::shared_ptr<VEBTree<T/2>>>(higher(value),
-                                                                                     std::make_shared<VEBTree<T/2>>(lower(value))));
+        data.insert(std::pair<unsigned long long, std::unique_ptr<VEBTree<T/2>>>(higher(value),
+                                                                                     std::make_unique<VEBTree<T/2>>(lower(value))));
         } else {
             data.at(higher(value))->add(lower(value));
         }
     }
 
     void remove(unsigned long long value) {
+        assert(has(value));
         if (value == min) {
             if (min == max) {
                 empty = true;
@@ -99,6 +108,7 @@ public:
     }
 
     unsigned long long next(unsigned long long value) const {
+        assert(has(value) && value != max);
         if (value == min) {
             if (data.empty()) {
                 return getMax();
@@ -116,6 +126,7 @@ public:
         return data.at(higher(value))->next(lower(value)) + (higher(value) << T);
     }
     unsigned long long prev(unsigned long long value) const {
+        assert(has(value)&& value != min);
         if (value == max) {
             if (data.empty()) {
                 return getMin();
@@ -134,9 +145,11 @@ public:
     }
 
     unsigned long long getMin() const {
+        assert(!empty);
         return min;
     }
     unsigned long long getMax() const {
+        assert(!empty);
         return max;
     }
 };
@@ -146,7 +159,7 @@ int main() {
      tree.add(5);
      tree.add(11);
      tree.add(10);
-     std::cout << tree.next(5) << std::endl;
+     std::cout << tree.next(6) << std::endl;
      tree.remove(10);
      std::cout << tree.next(5) << std::endl;
 }
